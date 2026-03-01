@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: blask
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run src/webapp.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SERPAPI_KEY
+        sync: false
+        optional: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+        optional: true
