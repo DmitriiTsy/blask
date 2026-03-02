@@ -110,6 +110,7 @@ class SearchNodeProcessor:
                 # Fallback to regular search
                 logger.warning("Trend analyzer not available, using regular search")
                 results = self.search_tool.search(search_query)
+                raw_data = {"type": "keywords", "query": search_query, "results": results, "fallback": "trend_analyzer_not_available"}
             else:
                 # Extract clean topic from search_query (remove "trends", years, etc.)
                 topic = self._extract_topic_from_query(search_query)
@@ -123,29 +124,41 @@ class SearchNodeProcessor:
                 logger.info(f"[Search Node] Trends list length: {len(trend_data.get('trends', []))}")
                 logger.info(f"[Search Node] Interest over time data points: {len(trend_data.get('interest_over_time', []))}")
                 
-                if trend_data.get("error"):
-                    logger.warning(f"[Search Node] Trend data contains error: {trend_data.get('error')}")
-                
-                if trend_data.get("count", 0) == 0:
-                    logger.warning(
-                        f"[Search Node] WARNING: No trends found (count=0) for topic '{topic}'. "
-                        f"Raw data structure: {list(trend_data.keys())}"
-                    )
-                
-                raw_data = trend_data
-                # Convert to results format
+                # Check if we need fallback to regular search
+                trend_count = trend_data.get("count", 0)
+                has_error = bool(trend_data.get("error"))
                 trends_list = trend_data.get("trends", [])
-                logger.debug(f"[Search Node] Converting {len(trends_list)} trends to results format")
-                results = [
-                    {
-                        "title": trend.get("title", ""),
-                        "snippet": trend.get("description", ""),
-                        "link": trend.get("source", ""),
-                        "type": "trend",
+                
+                if has_error or trend_count == 0 or len(trends_list) == 0:
+                    # Fallback to regular search if Google Trends failed or returned empty results
+                    reason = "error" if has_error else "empty_results"
+                    logger.warning(
+                        f"[Search Node] Google Trends failed or returned empty results (count={trend_count}, "
+                        f"error={has_error}). Falling back to regular search for query: '{search_query}'"
+                    )
+                    results = self.search_tool.search(search_query)
+                    raw_data = {
+                        "type": "keywords",
+                        "query": search_query,
+                        "results": results,
+                        "fallback": f"trends_{reason}",
+                        "original_trend_data": trend_data,
                     }
-                    for trend in trends_list
-                ]
-                logger.info(f"[Search Node] Converted {len(results)} trend results for search_type='trends'")
+                else:
+                    # Use trend data
+                    raw_data = trend_data
+                    # Convert to results format
+                    logger.debug(f"[Search Node] Converting {len(trends_list)} trends to results format")
+                    results = [
+                        {
+                            "title": trend.get("title", ""),
+                            "snippet": trend.get("description", ""),
+                            "link": trend.get("source", ""),
+                            "type": "trend",
+                        }
+                        for trend in trends_list
+                    ]
+                    logger.info(f"[Search Node] Converted {len(results)} trend results for search_type='trends'")
 
         else:
             # Default to keyword search
