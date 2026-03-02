@@ -164,6 +164,32 @@ def extract_chart_data(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     Returns:
         Chart data dictionary or None
     """
+    # Try to extract interest over time data (Google Trends)
+    if "interest_over_time" in data and data["interest_over_time"]:
+        timeline_data = data["interest_over_time"]
+        if isinstance(timeline_data, list) and len(timeline_data) > 0:
+            # Extract dates and values
+            dates = []
+            values = []
+            for point in timeline_data:
+                if isinstance(point, dict):
+                    dates.append(point.get("date", ""))
+                    # Extract value (can be in different formats)
+                    value = point.get("values", [{}])[0].get("value", 0) if isinstance(
+                        point.get("values"), list
+                    ) else point.get("value", 0)
+                    values.append(value if isinstance(value, (int, float)) else 0)
+
+            if dates and values:
+                return {
+                    "x": dates,
+                    "y": values,
+                    "title": f"Interest Over Time: {data.get('topic', 'Trend')}",
+                    "xlabel": "Date",
+                    "ylabel": "Interest",
+                    "chart_type": "line",  # Force line chart for time series
+                }
+
     # Try to extract numeric data
     if "values" in data:
         return {
@@ -210,11 +236,15 @@ def create_visualization(state: Dict[str, Any]) -> Optional[str]:
         return None
 
     # Determine chart type
-    chart_type = "bar"  # Default
-    if len(chart_data.get("x", [])) > 10:
-        chart_type = "line"
-    elif len(chart_data.get("x", [])) <= 5:
-        chart_type = "pie"
+    chart_type = chart_data.get("chart_type", "bar")  # Use specified type if available
+    if not chart_type or chart_type == "bar":
+        # Auto-detect based on data
+        if len(chart_data.get("x", [])) > 10:
+            chart_type = "line"
+        elif len(chart_data.get("x", [])) <= 5:
+            chart_type = "pie"
+        else:
+            chart_type = "bar"
 
     creator = MatplotlibChartCreator()
     return creator.create(chart_data, chart_type)

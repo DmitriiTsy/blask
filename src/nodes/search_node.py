@@ -181,7 +181,10 @@ def search_node(state: GraphState) -> GraphState:
         from ..config import get_settings
         from ..tools.competitor_tools import BasicCompetitorAnalyzer
         from ..tools.search_tools import MockSearchTool, SerpAPISearchTool
-        from ..tools.trend_tools import SearchBasedTrendAnalyzer
+        from ..tools.trend_tools import (
+            SearchBasedTrendAnalyzer,
+            SerpAPIGoogleTrendsAnalyzer,
+        )
 
         settings = get_settings()
 
@@ -195,7 +198,14 @@ def search_node(state: GraphState) -> GraphState:
 
         # Create analyzers
         competitor_analyzer = BasicCompetitorAnalyzer(search_tool) if search_tool else None
-        trend_analyzer = SearchBasedTrendAnalyzer(search_tool) if search_tool else None
+
+        # Use real Google Trends API if SerpAPI key available, otherwise fallback
+        if settings.serpapi_key:
+            logger.info("Using real Google Trends API via SerpAPI")
+            trend_analyzer = SerpAPIGoogleTrendsAnalyzer(settings.serpapi_key)
+        else:
+            logger.warning("Using SearchBasedTrendAnalyzer (fallback to regular search)")
+            trend_analyzer = SearchBasedTrendAnalyzer(search_tool) if search_tool else None
 
         processor = SearchNodeProcessor(
             search_tool, competitor_analyzer, trend_analyzer
