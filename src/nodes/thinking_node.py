@@ -57,8 +57,13 @@ class LLMDecisionMaker(DecisionMaker):
                     """You are an expert query analyzer. Your task:
 1. Determine query type: "search", "direct_answer", or "statistics"
 2. If search needed, determine type: "keywords", "competitors", or "trends"
-3. Create optimized search query
+3. Create optimized search query - DO NOT add years or dates unless user explicitly mentions them
 4. Determine if charts are needed (for statistics)
+
+IMPORTANT: 
+- Do NOT add years (like 2023, 2024) to search_query unless user explicitly asks for them
+- For trends queries, use current/recent trends, not specific past years
+- Keep search_query clean and focused on the topic
 
 Respond in JSON format:
 {{

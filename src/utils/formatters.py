@@ -50,7 +50,13 @@ class ResponseFormatter:
                     "system",
                     """You are a helpful assistant that formats data into clear, 
 user-friendly responses. Format the provided data in a structured, readable way.
-If charts were created, mention them in the response.""",
+If charts were created, mention them in the response.
+
+IMPORTANT:
+- Only mention specific years if they are in the original user query
+- Do NOT invent or assume years (like 2023, 2024) if not in the query
+- Focus on the actual data provided, not assumptions
+- If no data is available, say so clearly without mentioning specific years""",
                 ),
                 (
                     "human",

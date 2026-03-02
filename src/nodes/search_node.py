@@ -37,6 +37,29 @@ class SearchNodeProcessor:
         self.competitor_analyzer = competitor_analyzer
         self.trend_analyzer = trend_analyzer
 
+    def _extract_topic_from_query(self, query: str) -> str:
+        """
+        Extract clean topic from search query, removing trend-related words and years.
+
+        Args:
+            query: Search query that may contain "trends", years, etc.
+
+        Returns:
+            Clean topic string
+        """
+        import re
+
+        # Remove common trend-related words
+        query = re.sub(r'\b(trends?|trending|latest|current|recent)\b', '', query, flags=re.IGNORECASE)
+        
+        # Remove years (2020-2029)
+        query = re.sub(r'\b20[0-9]{2}\b', '', query)
+        
+        # Remove extra whitespace
+        query = ' '.join(query.split())
+        
+        return query.strip() or "trends"  # Fallback if everything was removed
+
     def process_search(self, state: GraphState) -> GraphState:
         """
         Process search based on state.
@@ -88,8 +111,10 @@ class SearchNodeProcessor:
                 logger.warning("Trend analyzer not available, using regular search")
                 results = self.search_tool.search(search_query)
             else:
-                logger.info(f"Getting trends: {search_query}")
-                trend_data = self.trend_analyzer.get_trends(search_query)
+                # Extract clean topic from search_query (remove "trends", years, etc.)
+                topic = self._extract_topic_from_query(search_query)
+                logger.info(f"Getting trends for topic: {topic}")
+                trend_data = self.trend_analyzer.get_trends(topic)
                 raw_data = trend_data
                 # Convert to results format
                 results = [
