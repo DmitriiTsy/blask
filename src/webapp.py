@@ -211,21 +211,6 @@ def main():
     with st.sidebar:
         st.header("⚙️ Configuration")
         st.markdown("---")
-
-        # Example queries
-        st.subheader("💡 Example Queries")
-        example_queries = [
-            "What are the latest AI trends?",
-            "Who are competitors in e-commerce?",
-            "Show Python usage statistics for the last year",
-            "What's trending in machine learning?",
-        ]
-
-        for query in example_queries:
-            if st.button(f"📌 {query}", key=f"example_{query}", use_container_width=True):
-                st.session_state.query = query
-
-        st.markdown("---")
         st.markdown("### 📚 About")
         st.info(
             """
@@ -241,18 +226,13 @@ def main():
 
     with col1:
         # Query input
-        default_query = st.session_state.get("query", "")
         user_query = st.text_area(
             "Enter your query:",
-            value=default_query,
+            value="",
             height=100,
             placeholder="Example: What are the latest trends in AI?",
             help="Ask about trends, competitors, or statistics",
         )
-
-        # Clear session state after using it
-        if "query" in st.session_state:
-            del st.session_state.query
 
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)  # Spacing
