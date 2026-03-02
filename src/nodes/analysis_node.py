@@ -42,6 +42,25 @@ class AnalysisNodeProcessor:
         user_query = state.get("user_query", "")
         needs_charts = state.get("needs_charts", False)
 
+        # Log incoming data
+        logger.info(f"[Analysis Node] Processing analysis for query: '{user_query}'")
+        logger.info(f"[Analysis Node] Search results count: {len(search_results)}")
+        logger.info(f"[Analysis Node] Raw data keys: {list(raw_data.keys()) if raw_data else 'None'}")
+        
+        if raw_data:
+            if "count" in raw_data:
+                logger.info(f"[Analysis Node] Raw data count: {raw_data.get('count')}")
+            if "trends" in raw_data:
+                logger.info(f"[Analysis Node] Raw data trends count: {len(raw_data.get('trends', []))}")
+            if "error" in raw_data:
+                logger.warning(f"[Analysis Node] Raw data contains error: {raw_data.get('error')}")
+        
+        if len(search_results) == 0:
+            logger.warning(
+                f"[Analysis Node] WARNING: No search results to process. "
+                f"This may indicate: 1) Empty API response, 2) No data found, 3) Processing error"
+            )
+
         # Prepare data for processing
         data_to_format = {
             "search_results": search_results,
@@ -60,10 +79,11 @@ class AnalysisNodeProcessor:
                 logger.info("Visualization created successfully")
 
         # Format response
-        logger.info("Formatting response")
+        logger.info(f"[Analysis Node] Formatting response (has_charts={charts_created})")
         formatted_response = self.formatter.format(
             query=user_query, data=data_to_format, has_charts=charts_created
         )
+        logger.info(f"[Analysis Node] Formatted response length: {len(formatted_response) if formatted_response else 0} characters")
 
         # Update state
         return {

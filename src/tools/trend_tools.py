@@ -166,17 +166,29 @@ class SerpAPIGoogleTrendsAnalyzer(TrendAnalyzer):
             }
 
         try:
+            logger.info(f"[Google Trends API] Starting request for topic: '{topic}', timeframe: {timeframe}")
+            
             # Get interest over time
+            # Note: For TIMESERIES, 'date' parameter may not be required or may need different format
+            # Try without date first, or use timeframe directly
             timeseries_params = {
                 "engine": "google_trends",
                 "q": topic,
                 "api_key": self.api_key,
                 "data_type": "TIMESERIES",
-                "date": self._convert_timeframe(timeframe),
             }
+            # Only add date if timeframe is specified and not default
+            # Some SerpAPI versions may not support 'date' parameter for TIMESERIES
+            # Try without it first - API may use default timeframe
+            logger.debug(f"[Google Trends API] TIMESERIES params: engine={timeseries_params['engine']}, q={timeseries_params['q']}, data_type={timeseries_params['data_type']}")
 
             timeseries_search = client(timeseries_params)
             timeseries_results = timeseries_search.get_dict()
+            
+            # Log TIMESERIES response structure
+            logger.debug(f"[Google Trends API] TIMESERIES response keys: {list(timeseries_results.keys())}")
+            if "error" in timeseries_results:
+                logger.warning(f"[Google Trends API] TIMESERIES error: {timeseries_results.get('error')}")
 
             # Get related queries
             related_params = {
@@ -185,47 +197,76 @@ class SerpAPIGoogleTrendsAnalyzer(TrendAnalyzer):
                 "api_key": self.api_key,
                 "data_type": "RELATED_QUERIES",
             }
+            logger.debug(f"[Google Trends API] RELATED_QUERIES params: engine={related_params['engine']}, q={related_params['q']}")
 
             related_search = client(related_params)
             related_results = related_search.get_dict()
+            
+            # Log RELATED_QUERIES response structure
+            logger.debug(f"[Google Trends API] RELATED_QUERIES response keys: {list(related_results.keys())}")
+            if "error" in related_results:
+                logger.warning(f"[Google Trends API] RELATED_QUERIES error: {related_results.get('error')}")
 
             # Extract interest over time data
             interest_over_time = timeseries_results.get("interest_over_time", {})
             timeline_data = interest_over_time.get("timeline_data", [])
+            logger.info(f"[Google Trends API] Interest over time data points: {len(timeline_data)}")
+            if timeline_data:
+                logger.debug(f"[Google Trends API] First timeline entry: {timeline_data[0] if len(timeline_data) > 0 else 'N/A'}")
+            else:
+                logger.warning(f"[Google Trends API] No timeline data found. interest_over_time structure: {list(interest_over_time.keys())}")
 
             # Extract related queries
             related_queries_data = related_results.get("related_queries", {})
             rising_queries = related_queries_data.get("rising", [])
             top_queries = related_queries_data.get("top", [])
+            logger.info(f"[Google Trends API] Rising queries found: {len(rising_queries)}, Top queries found: {len(top_queries)}")
+            if not rising_queries and not top_queries:
+                logger.warning(f"[Google Trends API] No related queries found. related_queries structure: {list(related_queries_data.keys())}")
+                logger.debug(f"[Google Trends API] Full related_queries_data: {related_queries_data}")
 
             # Format trends list
             trends = []
             for query in rising_queries[:10]:
+                query_text = query.get("query", "")
+                query_value = query.get("value", 0)
+                logger.debug(f"[Google Trends API] Adding rising query: '{query_text}' (value: {query_value})")
                 trends.append(
                     {
-                        "title": query.get("query", ""),
-                        "description": f"Rising query with {query.get('value', 0)}% increase",
+                        "title": query_text,
+                        "description": f"Rising query with {query_value}% increase",
                         "source": "google_trends",
                         "type": "rising",
-                        "value": query.get("value", 0),
+                        "value": query_value,
                     }
                 )
 
             for query in top_queries[:10]:
+                query_text = query.get("query", "")
+                query_value = query.get("value", 0)
+                logger.debug(f"[Google Trends API] Adding top query: '{query_text}' (value: {query_value})")
                 trends.append(
                     {
-                        "title": query.get("query", ""),
+                        "title": query_text,
                         "description": f"Top related query",
                         "source": "google_trends",
                         "type": "top",
-                        "value": query.get("value", 0),
+                        "value": query_value,
                     }
                 )
 
             logger.info(
-                f"Found {len(trends)} trends for topic: {topic} "
-                f"(Interest over time: {len(timeline_data)} data points)"
+                f"[Google Trends API] Total trends formatted: {len(trends)} for topic: '{topic}' "
+                f"(Interest over time: {len(timeline_data)} data points, "
+                f"Rising: {len(rising_queries)}, Top: {len(top_queries)})"
             )
+            
+            if len(trends) == 0:
+                logger.warning(
+                    f"[Google Trends API] WARNING: No trends found for topic '{topic}'. "
+                    f"This may indicate: 1) Topic too specific/rare, 2) No data in Google Trends, "
+                    f"3) API response structure different than expected"
+                )
 
             return {
                 "topic": topic,
@@ -241,7 +282,9 @@ class SerpAPIGoogleTrendsAnalyzer(TrendAnalyzer):
             }
 
         except Exception as e:
-            logger.error(f"Error in Google Trends API: {e}")
+            import traceback
+            logger.error(f"[Google Trends API] Exception occurred: {type(e).__name__}: {e}")
+            logger.debug(f"[Google Trends API] Full traceback: {traceback.format_exc()}")
             # Fallback to empty results
             return {
                 "topic": topic,

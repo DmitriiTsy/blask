@@ -113,10 +113,29 @@ class SearchNodeProcessor:
             else:
                 # Extract clean topic from search_query (remove "trends", years, etc.)
                 topic = self._extract_topic_from_query(search_query)
-                logger.info(f"Getting trends for topic: {topic}")
+                logger.info(f"[Search Node] Original query: '{search_query}' -> Extracted topic: '{topic}'")
+                logger.info(f"[Search Node] Calling trend_analyzer.get_trends() for topic: '{topic}'")
                 trend_data = self.trend_analyzer.get_trends(topic)
+                
+                # Log trend data structure
+                logger.info(f"[Search Node] Trend data received - keys: {list(trend_data.keys())}")
+                logger.info(f"[Search Node] Trend count: {trend_data.get('count', 0)}")
+                logger.info(f"[Search Node] Trends list length: {len(trend_data.get('trends', []))}")
+                logger.info(f"[Search Node] Interest over time data points: {len(trend_data.get('interest_over_time', []))}")
+                
+                if trend_data.get("error"):
+                    logger.warning(f"[Search Node] Trend data contains error: {trend_data.get('error')}")
+                
+                if trend_data.get("count", 0) == 0:
+                    logger.warning(
+                        f"[Search Node] WARNING: No trends found (count=0) for topic '{topic}'. "
+                        f"Raw data structure: {list(trend_data.keys())}"
+                    )
+                
                 raw_data = trend_data
                 # Convert to results format
+                trends_list = trend_data.get("trends", [])
+                logger.debug(f"[Search Node] Converting {len(trends_list)} trends to results format")
                 results = [
                     {
                         "title": trend.get("title", ""),
@@ -124,8 +143,9 @@ class SearchNodeProcessor:
                         "link": trend.get("source", ""),
                         "type": "trend",
                     }
-                    for trend in trend_data.get("trends", [])
+                    for trend in trends_list
                 ]
+                logger.info(f"[Search Node] Converted {len(results)} trend results for search_type='trends'")
 
         else:
             # Default to keyword search
