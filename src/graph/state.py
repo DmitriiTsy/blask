@@ -47,6 +47,12 @@ class GraphState(TypedDict):
     competitor_changes: List[Dict[str, Any]]
     new_competitors: List[Dict[str, Any]]
     agent_intermediate_steps: List[Dict[str, Any]]  # Intermediate results from agent
+    
+    # Market Intelligence Agent fields
+    countries_to_analyze: List[str]  # List of countries to analyze
+    market_analysis_results: Dict[str, Dict[str, Any]]  # country -> analysis results
+    market_comparison_summary: Optional[Dict[str, Any]]
+    market_intermediate_steps: List[Dict[str, Any]]  # Intermediate results by country
 
 
 def create_initial_state(user_query: str, user_id: Optional[str] = None) -> GraphState:
@@ -86,4 +92,8 @@ def create_initial_state(user_query: str, user_id: Optional[str] = None) -> Grap
         competitor_changes=[],
         new_competitors=[],
         agent_intermediate_steps=[],
+        countries_to_analyze=[],
+        market_analysis_results={},
+        market_comparison_summary=None,
+        market_intermediate_steps=[],
     )

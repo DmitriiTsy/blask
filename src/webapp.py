@@ -5,6 +5,7 @@ import io
 import sys
 from io import BytesIO
 from pathlib import Path
+from typing import List
 
 import pandas as pd
 import streamlit as st
@@ -199,6 +200,169 @@ def display_thinking_component(result: dict) -> None:
         st.code(path_str, language=None)
 
 
+def display_market_intelligence_results(result: dict, countries: List[str]) -> None:
+    """
+    Display Market Intelligence Agent results with intermediate steps by country.
+    
+    Args:
+        result: Agent execution result
+        countries: List of analyzed countries
+    """
+    st.markdown("---")
+    st.markdown("## 🌍 Market Intelligence Results")
+    
+    # Summary
+    comparison_summary = result.get("comparison_summary", {})
+    if comparison_summary:
+        st.markdown("### 📊 Summary")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Countries Analyzed", comparison_summary.get("total_countries", 0))
+        with col2:
+            st.metric("Total Platforms Found", comparison_summary.get("total_platforms", 0))
+        with col3:
+            st.metric("Total Opportunities", comparison_summary.get("total_opportunities", 0))
+        with col4:
+            # Count market sizes
+            market_sizes = comparison_summary.get("market_sizes", {})
+            large_markets = sum(1 for s in market_sizes.values() if s == "large")
+            st.metric("Large Markets", large_markets)
+    
+    # Results by country
+    results_by_country = result.get("results", {})
+    
+    for country in countries:
+        if country not in results_by_country:
+            continue
+            
+        country_result = results_by_country[country]
+        
+        st.markdown("---")
+        st.markdown(f"### 🇺🇳 {country}")
+        
+        # Market Size Analysis
+        market_size = country_result.get("market_size", {})
+        if market_size:
+            st.markdown("#### 📈 Market Size Analysis")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                size = market_size.get("market_size", "unknown")
+                size_emoji = {"large": "🔴", "medium": "🟡", "small": "🟢"}.get(size, "⚪")
+                st.metric("Market Size", f"{size_emoji} {size.title()}")
+            with col2:
+                st.metric("Active Operators", market_size.get("active_operators", 0))
+            with col3:
+                maturity = market_size.get("market_maturity", "unknown")
+                st.metric("Market Maturity", maturity.title())
+            with col4:
+                growth = market_size.get("growth_potential", "unknown")
+                growth_emoji = {"high": "📈", "medium": "➡️", "low": "📉"}.get(growth, "⚪")
+                st.metric("Growth Potential", f"{growth_emoji} {growth.title()}")
+            
+            if market_size.get("estimated_volume"):
+                st.caption(f"Estimated Market Volume: ${market_size.get('estimated_volume', 0):,}")
+        
+        # White Label Platforms
+        platforms = country_result.get("platforms", {})
+        if platforms and platforms.get("platforms"):
+            st.markdown("#### 🏢 White Label Platforms Found")
+            st.success(f"Found {platforms.get('count', 0)} platforms")
+            
+            platforms_list = platforms.get("platforms", [])
+            with st.expander(f"View {len(platforms_list)} Platforms"):
+                for i, platform in enumerate(platforms_list[:20], 1):
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        platform_type = platform.get("type", "white_label")
+                        type_emoji = {
+                            "white_label": "🏷️",
+                            "software_provider": "💻",
+                            "turnkey": "🔧"
+                        }.get(platform_type, "📦")
+                        st.markdown(f"**{i}. {type_emoji} {platform.get('name', 'Unknown')}**")
+                        st.caption(f"Type: {platform_type.replace('_', ' ').title()}")
+                        if platform.get('description'):
+                            st.write(platform['description'][:200] + "...")
+                    with col2:
+                        if platform.get('url'):
+                            st.markdown(f"[🔗 Visit]({platform['url']})")
+                    st.markdown("---")
+        
+        # Growth Opportunities
+        opportunities = country_result.get("opportunities", {})
+        if opportunities:
+            st.markdown("#### 🚀 Growth Opportunities")
+            
+            opps_list = opportunities.get("opportunities", [])
+            barriers_list = opportunities.get("entry_barriers", [])
+            recommendations = opportunities.get("recommendations", [])
+            
+            if opps_list:
+                st.success(f"Found {len(opps_list)} opportunities")
+                with st.expander(f"View {len(opps_list)} Opportunities"):
+                    for i, opp in enumerate(opps_list[:10], 1):
+                        st.markdown(f"**{i}. {opp.get('title', 'Opportunity')}**")
+                        st.write(opp.get('description', '')[:300] + "...")
+                        if opp.get('source'):
+                            st.markdown(f"[🔗 Source]({opp['source']})")
+                        st.markdown("---")
+            
+            if barriers_list:
+                st.warning(f"Found {len(barriers_list)} entry barriers")
+                with st.expander(f"View {len(barriers_list)} Entry Barriers"):
+                    for i, barrier in enumerate(barriers_list[:10], 1):
+                        st.markdown(f"**{i}. {barrier.get('title', 'Barrier')}**")
+                        st.write(barrier.get('description', '')[:300] + "...")
+                        if barrier.get('source'):
+                            st.markdown(f"[🔗 Source]({barrier['source']})")
+                        st.markdown("---")
+            
+            if recommendations:
+                st.info("💡 Recommendations:")
+                for rec in recommendations:
+                    st.markdown(f"- {rec}")
+        
+        # Intermediate steps for this country
+        country_steps = [
+            step for step in result.get("total_intermediate_steps", [])
+            if step.get("input", {}).get("country") == country
+        ]
+        
+        if country_steps:
+            with st.expander(f"🔍 View Analysis Steps for {country}"):
+                for i, step in enumerate(country_steps, 1):
+                    tool_name = step.get("tool", "unknown")
+                    tool_output = step.get("output", {})
+                    
+                    st.markdown(f"**Step {i}: {tool_name.replace('_', ' ').title()}**")
+                    if isinstance(tool_output, dict):
+                        # Show key metrics
+                        if "market_size" in tool_output:
+                            st.caption(f"Market Size: {tool_output.get('market_size', 'N/A')}")
+                        if "count" in tool_output:
+                            st.caption(f"Count: {tool_output.get('count', 0)}")
+                        if "opportunity_count" in tool_output:
+                            st.caption(f"Opportunities: {tool_output.get('opportunity_count', 0)}")
+                    st.markdown("---")
+    
+    # Comparison chart
+    if len(countries) > 1 and comparison_summary:
+        st.markdown("---")
+        st.markdown("### 📊 Market Comparison")
+        
+        market_sizes = comparison_summary.get("market_sizes", {})
+        if market_sizes:
+            # Create comparison chart
+            size_values = {"small": 1, "medium": 2, "large": 3}
+            chart_data = {
+                "Country": list(market_sizes.keys()),
+                "Market Size": [size_values.get(s, 0) for s in market_sizes.values()]
+            }
+            chart_df = pd.DataFrame(chart_data)
+            st.bar_chart(chart_df.set_index("Country")["Market Size"])
+
+
 def display_competitor_tracker_results(result: dict) -> None:
     """
     Display Competitor Tracker Agent results with intermediate steps.
@@ -346,12 +510,17 @@ def main():
             - 🤔 Thinking Node (decision making)
             - 🔍 Search Node (keyword & competitor search)
             - 🎯 Competitor Tracker Agent (AI-powered competitor tracking)
+            - 🌍 Market Intelligence Agent (market analysis & platform discovery)
             - 📊 Analysis Node (data processing & visualization)
             """
         )
 
     # Tabs
-    tab1, tab2 = st.tabs(["🔍 General Analysis", "🎯 Competitor Tracker"])
+    tab1, tab2, tab3 = st.tabs([
+        "🔍 General Analysis", 
+        "🎯 Competitor Tracker",
+        "🌍 Market Intelligence"
+    ])
 
     with tab1:
         # Main content
@@ -509,6 +678,72 @@ def main():
 
         elif track_button and not brand_query:
             st.warning("⚠️ Please enter a brand name first!")
+
+    with tab3:
+        st.markdown("## 🌍 Market Intelligence Agent")
+        st.info(
+            """
+            **Market Intelligence Agent** analyzes markets for white label iGaming casino platforms:
+            - Market size analysis
+            - White label platform discovery
+            - Growth opportunities identification
+            - Regional market analysis
+            
+            Enter countries separated by commas to analyze multiple markets.
+            """
+        )
+
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            countries_input = st.text_area(
+                "Enter countries to analyze (comma-separated):",
+                value="",
+                height=100,
+                placeholder="Example: Spain, UK, Germany",
+                help="Enter country names separated by commas. The agent will analyze each country sequentially.",
+            )
+
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            analyze_button = st.button("🌍 Analyze Markets", type="primary", use_container_width=True)
+
+        col3, col4 = st.columns(2)
+        with col3:
+            include_platforms = st.checkbox("Find White Label Platforms", value=True)
+        with col4:
+            include_opportunities = st.checkbox("Identify Growth Opportunities", value=True)
+
+        if analyze_button and countries_input:
+            # Parse countries
+            countries = [c.strip() for c in countries_input.split(",") if c.strip()]
+            
+            if not countries:
+                st.warning("⚠️ Please enter at least one country!")
+            else:
+                with st.spinner(f"🔄 Analyzing {len(countries)} countries..."):
+                    try:
+                        from src.agents.market_intelligence_agent import MarketIntelligenceAgent
+                        
+                        # Create agent
+                        agent = MarketIntelligenceAgent()
+                        
+                        # Analyze countries
+                        result = agent.analyze_multiple_countries(
+                            countries,
+                            include_platforms=include_platforms,
+                            include_opportunities=include_opportunities,
+                        )
+                        
+                        # Display results
+                        display_market_intelligence_results(result, countries)
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error analyzing markets: {str(e)}")
+                        logger.error(f"Error in market intelligence: {e}", exc_info=True)
+
+        elif analyze_button and not countries_input:
+            st.warning("⚠️ Please enter countries to analyze first!")
 
     # Footer
     st.markdown("---")
