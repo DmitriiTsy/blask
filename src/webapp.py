@@ -6,6 +6,7 @@ import sys
 from io import BytesIO
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 from PIL import Image
 
@@ -198,6 +199,133 @@ def display_thinking_component(result: dict) -> None:
         st.code(path_str, language=None)
 
 
+def display_competitor_tracker_results(result: dict) -> None:
+    """
+    Display Competitor Tracker Agent results with intermediate steps.
+    
+    Args:
+        result: Graph execution result
+    """
+    st.markdown("---")
+    st.markdown("## 🎯 Competitor Tracker Results")
+    
+    # Intermediate steps
+    intermediate_steps = result.get("agent_intermediate_steps", [])
+    competitors_list = result.get("competitors_list", [])
+    competitor_keywords = result.get("competitor_keywords", {})
+    competitor_metrics = result.get("competitor_metrics", {})
+    
+    # Step 1: Competitors Found
+    if competitors_list:
+        st.markdown("### ✅ Step 1: Competitors Identified")
+        st.success(f"Found {len(competitors_list)} competitors")
+        
+        with st.expander(f"View {len(competitors_list)} Competitors"):
+            for i, competitor in enumerate(competitors_list[:20], 1):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"**{i}. {competitor.get('name', 'Unknown')}**")
+                    st.caption(f"Domain: {competitor.get('domain', 'N/A')}")
+                    if competitor.get('description'):
+                        st.write(competitor['description'][:200] + "...")
+                with col2:
+                    if competitor.get('url'):
+                        st.markdown(f"[🔗 Visit]({competitor['url']})")
+    
+    # Step 2: Keywords Monitored
+    if competitor_keywords:
+        st.markdown("### 🔑 Step 2: Keywords Monitored")
+        
+        for competitor, keywords in competitor_keywords.items():
+            if keywords:
+                with st.expander(f"Keywords for {competitor} ({len(keywords)} keywords)"):
+                    # Group by type
+                    rising_keywords = [k for k in keywords if k.get('type') == 'rising']
+                    top_keywords = [k for k in keywords if k.get('type') == 'top']
+                    
+                    if rising_keywords:
+                        st.markdown("**📈 Rising Keywords:**")
+                        for kw in rising_keywords[:10]:
+                            growth = kw.get('growth', 0)
+                            st.markdown(f"- {kw.get('keyword', '')} (Growth: {growth})")
+                    
+                    if top_keywords:
+                        st.markdown("**⭐ Top Keywords:**")
+                        for kw in top_keywords[:10]:
+                            volume = kw.get('volume', 0)
+                            st.markdown(f"- {kw.get('keyword', '')} (Volume: {volume})")
+    
+    # Step 3: Metrics Calculated
+    if competitor_metrics:
+        st.markdown("### 📊 Step 3: Metrics Calculated")
+        
+        # Create metrics table
+        metrics_data = []
+        for competitor, metrics in competitor_metrics.items():
+            if metrics and not metrics.get('error'):
+                metrics_data.append({
+                    "Competitor": competitor,
+                    "BAP": metrics.get('bap', 'N/A'),
+                    "APS": metrics.get('aps', 'N/A'),
+                    "CEB": f"${metrics.get('ceb', 0):,.0f}" if metrics.get('ceb') else 'N/A',
+                    "Avg Interest": metrics.get('avg_interest', 'N/A'),
+                    "Growth Rate": f"{metrics.get('growth_rate', 0):.2%}" if metrics.get('growth_rate') else 'N/A',
+                })
+        
+        if metrics_data:
+            import pandas as pd
+            df = pd.DataFrame(metrics_data)
+            st.dataframe(df, use_container_width=True)
+            
+            # Visualizations
+            if len(metrics_data) > 0:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # BAP comparison chart
+                    if any(m.get('BAP') != 'N/A' for m in metrics_data):
+                        chart_data = {
+                            'Competitor': [m['Competitor'] for m in metrics_data],
+                            'BAP': [float(m['BAP']) if m['BAP'] != 'N/A' else 0 for m in metrics_data]
+                        }
+                        chart_df = pd.DataFrame(chart_data)
+                        st.bar_chart(chart_df.set_index('Competitor')['BAP'])
+                
+                with col2:
+                    # APS comparison chart
+                    if any(m.get('APS') != 'N/A' for m in metrics_data):
+                        chart_data = {
+                            'Competitor': [m['Competitor'] for m in metrics_data],
+                            'APS': [float(m['APS']) if m['APS'] != 'N/A' else 0 for m in metrics_data]
+                        }
+                        chart_df = pd.DataFrame(chart_data)
+                        st.bar_chart(chart_df.set_index('Competitor')['APS'])
+    
+    # Intermediate steps details
+    if intermediate_steps:
+        st.markdown("### 🔍 Agent Execution Steps")
+        with st.expander("View Detailed Agent Steps"):
+            for i, step in enumerate(intermediate_steps, 1):
+                tool_name = step.get("tool", "unknown")
+                tool_input = step.get("input", {})
+                tool_output = step.get("output", {})
+                
+                st.markdown(f"**Step {i}: {tool_name}**")
+                st.json({
+                    "input": tool_input,
+                    "output_summary": {
+                        "keys": list(tool_output.keys()) if isinstance(tool_output, dict) else "N/A",
+                        "type": type(tool_output).__name__
+                    }
+                })
+                st.markdown("---")
+    
+    # Final summary
+    if result.get("tracked_competitors"):
+        st.markdown("### 📝 Summary")
+        st.info(result.get("tracked_competitors", ""))
+
+
 def main():
     """Main Streamlit application."""
     # Header
@@ -217,95 +345,170 @@ def main():
             **Blask** analyzes trends, competitors, and statistics using:
             - 🤔 Thinking Node (decision making)
             - 🔍 Search Node (keyword & competitor search)
+            - 🎯 Competitor Tracker Agent (AI-powered competitor tracking)
             - 📊 Analysis Node (data processing & visualization)
             """
         )
 
-    # Main content
-    col1, col2 = st.columns([3, 1])
+    # Tabs
+    tab1, tab2 = st.tabs(["🔍 General Analysis", "🎯 Competitor Tracker"])
 
-    with col1:
-        # Query input
-        user_query = st.text_area(
-            "Enter your query:",
-            value="",
-            height=100,
-            placeholder="Example: What are the latest trends in AI?",
-            help="Ask about trends, competitors, or statistics",
+    with tab1:
+        # Main content
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            # Query input
+            user_query = st.text_area(
+                "Enter your query:",
+                value="",
+                height=100,
+                placeholder="Example: What are the latest trends in AI?",
+                help="Ask about trends, competitors, or statistics",
+            )
+
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+            analyze_button = st.button("🚀 Analyze", type="primary", use_container_width=True)
+
+        # Process query
+        if analyze_button and user_query:
+            with st.spinner("🔄 Processing your query..."):
+                try:
+                    # Create graph
+                    graph = create_graph()
+
+                    # Create initial state
+                    initial_state = create_initial_state(user_query.strip())
+
+                    # Execute graph
+                    result = graph.invoke(initial_state)
+
+                    # Display Thinking Component first
+                    display_thinking_component(result)
+
+                    # Display results
+                    st.markdown("---")
+                    st.markdown("## 📋 Results")
+
+                    # Decision info
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Decision", result.get("decision", "N/A"))
+                    with col2:
+                        st.metric("Search Type", result.get("search_type", "N/A") or "N/A")
+                    with col3:
+                        st.metric("Charts Created", "Yes" if result.get("charts_created") else "No")
+
+                    # Formatted response
+                    if result.get("formatted_response"):
+                        st.markdown("---")
+                        st.markdown("## 💬 Response")
+                        st.markdown(result["formatted_response"])
+
+                    # Visualization
+                    if result.get("visualization"):
+                        st.markdown("---")
+                        st.markdown("## 📊 Visualization")
+                        display_visualization(result["visualization"])
+
+                    # Search results (if available)
+                    if result.get("search_results"):
+                        st.markdown("---")
+                        st.markdown("## 🔍 Search Results")
+                        with st.expander(f"View {len(result['search_results'])} results"):
+                            for i, res in enumerate(result["search_results"][:10], 1):
+                                st.markdown(f"### {i}. {res.get('title', 'No title')}")
+                                st.write(res.get("snippet", "No description"))
+                                if res.get("link"):
+                                    st.markdown(f"[🔗 Link]({res['link']})")
+                                st.markdown("---")
+
+                    # Error handling
+                    if result.get("error"):
+                        st.error(f"❌ Error: {result['error']}")
+
+                    # Raw data (debug)
+                    if st.checkbox("Show debug info"):
+                        with st.expander("🐛 Debug Information"):
+                            st.json(result)
+
+                except Exception as e:
+                    st.error(f"❌ Error processing query: {str(e)}")
+                    logger.error(f"Error in webapp: {e}", exc_info=True)
+
+        elif analyze_button and not user_query:
+            st.warning("⚠️ Please enter a query first!")
+
+    with tab2:
+        st.markdown("## 🎯 Competitor Tracker Agent")
+        st.info(
+            """
+            **Competitor Tracker Agent** automatically:
+            - Identifies competitors in online casino industry
+            - Monitors their keywords
+            - Calculates metrics (BAP, APS, CEB)
+            - Tracks changes in strategy
+            - Discovers new competitors
+            """
         )
 
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-        analyze_button = st.button("🚀 Analyze", type="primary", use_container_width=True)
+        col1, col2 = st.columns([3, 1])
 
-    # Process query
-    if analyze_button and user_query:
-        with st.spinner("🔄 Processing your query..."):
-            try:
-                # Create graph
-                graph = create_graph()
+        with col1:
+            brand_query = st.text_input(
+                "Enter brand name to track competitors:",
+                value="",
+                placeholder="Example: bet365",
+                help="Enter the name of the brand to find and analyze competitors",
+            )
 
-                # Create initial state
-                initial_state = create_initial_state(user_query.strip())
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            track_button = st.button("🎯 Track Competitors", type="primary", use_container_width=True)
 
-                # Execute graph
-                result = graph.invoke(initial_state)
+        country_input = st.text_input(
+            "Country (optional):",
+            value="",
+            placeholder="Example: UK, US",
+            help="Optional country code for localized search",
+        )
 
-                # Display Thinking Component first
-                display_thinking_component(result)
+        if track_button and brand_query:
+            with st.spinner("🔄 Tracking competitors..."):
+                try:
+                    # Create graph
+                    graph = create_graph()
 
-                # Display results
-                st.markdown("---")
-                st.markdown("## 📋 Results")
+                    # Create initial state with brand name
+                    initial_state = create_initial_state(
+                        f"Find and analyze competitors for {brand_query}"
+                    )
+                    initial_state["brand_name"] = brand_query.strip()
+                    if country_input:
+                        initial_state["country"] = country_input.strip()
 
-                # Decision info
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Decision", result.get("decision", "N/A"))
-                with col2:
-                    st.metric("Search Type", result.get("search_type", "N/A") or "N/A")
-                with col3:
-                    st.metric("Charts Created", "Yes" if result.get("charts_created") else "No")
+                    # Execute graph
+                    result = graph.invoke(initial_state)
 
-                # Formatted response
-                if result.get("formatted_response"):
-                    st.markdown("---")
-                    st.markdown("## 💬 Response")
-                    st.markdown(result["formatted_response"])
+                    # Display results
+                    display_competitor_tracker_results(result)
 
-                # Visualization
-                if result.get("visualization"):
-                    st.markdown("---")
-                    st.markdown("## 📊 Visualization")
-                    display_visualization(result["visualization"])
+                    # Error handling
+                    if result.get("error"):
+                        st.error(f"❌ Error: {result['error']}")
 
-                # Search results (if available)
-                if result.get("search_results"):
-                    st.markdown("---")
-                    st.markdown("## 🔍 Search Results")
-                    with st.expander(f"View {len(result['search_results'])} results"):
-                        for i, res in enumerate(result["search_results"][:10], 1):
-                            st.markdown(f"### {i}. {res.get('title', 'No title')}")
-                            st.write(res.get("snippet", "No description"))
-                            if res.get("link"):
-                                st.markdown(f"[🔗 Link]({res['link']})")
-                            st.markdown("---")
+                    # Debug info
+                    if st.checkbox("Show debug info", key="debug_competitor"):
+                        with st.expander("🐛 Debug Information"):
+                            st.json(result)
 
-                # Error handling
-                if result.get("error"):
-                    st.error(f"❌ Error: {result['error']}")
+                except Exception as e:
+                    st.error(f"❌ Error tracking competitors: {str(e)}")
+                    logger.error(f"Error in competitor tracker: {e}", exc_info=True)
 
-                # Raw data (debug)
-                if st.checkbox("Show debug info"):
-                    with st.expander("🐛 Debug Information"):
-                        st.json(result)
-
-            except Exception as e:
-                st.error(f"❌ Error processing query: {str(e)}")
-                logger.error(f"Error in webapp: {e}", exc_info=True)
-
-    elif analyze_button and not user_query:
-        st.warning("⚠️ Please enter a query first!")
+        elif track_button and not brand_query:
+            st.warning("⚠️ Please enter a brand name first!")
 
     # Footer
     st.markdown("---")

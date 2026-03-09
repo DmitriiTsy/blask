@@ -8,12 +8,15 @@ from ..graph.state import GraphState
 from ..nodes.analysis_node import analysis_node
 from ..nodes.search_node import search_node
 from ..nodes.thinking_node import thinking_node
+from ..nodes.competitor_tracker_node import competitor_tracker_node
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def route_after_thinking(state: GraphState) -> Literal["search_node", "analysis_node"]:
+def route_after_thinking(
+    state: GraphState,
+) -> Literal["search_node", "analysis_node", "competitor_tracker_node"]:
     """
     Route after thinking node based on decision (SOLID - Single Responsibility).
 
@@ -24,10 +27,25 @@ def route_after_thinking(state: GraphState) -> Literal["search_node", "analysis_
         Next node name
     """
     decision = state.get("decision", "")
+    user_query = state.get("user_query", "").lower()
+
+    # Check if query is about competitor tracking
+    competitor_keywords = [
+        "competitor",
+        "competitors",
+        "track competitors",
+        "find competitors",
+        "analyze competitors",
+        "who are competitors",
+    ]
+    is_competitor_query = any(keyword in user_query for keyword in competitor_keywords)
 
     if decision == "direct_answer":
         logger.info("Routing to analysis_node (direct answer)")
         return "analysis_node"
+    elif is_competitor_query or decision == "competitor_tracking":
+        logger.info("Routing to competitor_tracker_node")
+        return "competitor_tracker_node"
     elif decision in ["search", "statistics"]:
         logger.info("Routing to search_node")
         return "search_node"
@@ -64,6 +82,7 @@ def create_graph() -> StateGraph:
     # Add nodes
     workflow.add_node("thinking_node", thinking_node)
     workflow.add_node("search_node", search_node)
+    workflow.add_node("competitor_tracker_node", competitor_tracker_node)
     workflow.add_node("analysis_node", analysis_node)
 
     # Set entry point
@@ -75,12 +94,16 @@ def create_graph() -> StateGraph:
         route_after_thinking,
         {
             "search_node": "search_node",
+            "competitor_tracker_node": "competitor_tracker_node",
             "analysis_node": "analysis_node",
         },
     )
 
     # Add edge from search to analysis
     workflow.add_edge("search_node", "analysis_node")
+    
+    # Add edge from competitor tracker to analysis
+    workflow.add_edge("competitor_tracker_node", "analysis_node")
 
     # Set exit point
     workflow.add_edge("analysis_node", END)

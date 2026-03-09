@@ -36,6 +36,17 @@ class GraphState(TypedDict):
     conversation_history: List[Dict[str, str]]
     execution_path: List[str]  # For tracing and debugging
     error: Optional[str]
+    
+    # Competitor Tracker Agent fields
+    brand_name: Optional[str]
+    country: Optional[str]
+    tracked_competitors: Optional[Dict[str, Any]]
+    competitors_list: List[Dict[str, Any]]
+    competitor_keywords: Dict[str, List[Dict[str, Any]]]  # competitor -> keywords
+    competitor_metrics: Dict[str, Dict[str, Any]]  # competitor -> metrics
+    competitor_changes: List[Dict[str, Any]]
+    new_competitors: List[Dict[str, Any]]
+    agent_intermediate_steps: List[Dict[str, Any]]  # Intermediate results from agent
 
 
 def create_initial_state(user_query: str, user_id: Optional[str] = None) -> GraphState:
@@ -66,4 +77,13 @@ def create_initial_state(user_query: str, user_id: Optional[str] = None) -> Grap
         conversation_history=[],
         execution_path=[],
         error=None,
+        brand_name=None,
+        country=None,
+        tracked_competitors=None,
+        competitors_list=[],
+        competitor_keywords={},
+        competitor_metrics={},
+        competitor_changes=[],
+        new_competitors=[],
+        agent_intermediate_steps=[],
     )
