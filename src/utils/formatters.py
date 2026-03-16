@@ -64,12 +64,15 @@ IMPORTANT:
 Data: {data}
 Has charts: {has_charts}
 
-Format this into a clear response for the user.""",
+Knowledge Base Context:
+{kb_context}
+
+Format this into a clear response for the user. Use the knowledge base context if it's relevant to the query.""",
                 ),
             ]
         )
 
-    def format(self, query: str, data: Dict[str, Any], has_charts: bool) -> str:
+    def format(self, query: str, data: Dict[str, Any], has_charts: bool, kb_context: str = "") -> str:
         """
         Format data into response.
 
@@ -77,6 +80,7 @@ Format this into a clear response for the user.""",
             query: Original user query
             data: Data to format
             has_charts: Whether charts were created
+            kb_context: Optional knowledge base context
 
         Returns:
             Formatted response string
@@ -93,6 +97,7 @@ Format this into a clear response for the user.""",
                     "query": query,
                     "data": data_str,
                     "has_charts": "Yes" if has_charts else "No",
+                    "kb_context": kb_context if kb_context else "No relevant context found in knowledge base.",
                 }
             )
 

@@ -6,6 +6,7 @@ import sys
 from io import BytesIO
 from pathlib import Path
 from typing import List
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -323,6 +324,127 @@ def display_market_intelligence_results(result: dict, countries: List[str]) -> N
                 for rec in recommendations:
                     st.markdown(f"- {rec}")
         
+        # Jurisdiction Analysis (Legal/Regulatory)
+        jurisdiction = country_result.get("jurisdiction", {})
+        if jurisdiction and not jurisdiction.get("error"):
+            st.markdown("#### ⚖️ Legal & Jurisdiction Analysis")
+            
+            # Regulations
+            regulations = jurisdiction.get("regulations", {})
+            if regulations:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    legal_status = regulations.get("legal_status", "unknown")
+                    status_emoji = {
+                        "legal": "✅",
+                        "regulated": "📋",
+                        "restricted": "⚠️",
+                        "illegal": "❌",
+                    }.get(legal_status, "❓")
+                    st.metric("Legal Status", f"{status_emoji} {legal_status.title()}")
+                with col2:
+                    licensing = regulations.get("licensing_required", False)
+                    st.metric("Licensing Required", "Yes" if licensing else "No")
+                with col3:
+                    regulatory_body = regulations.get("regulatory_body", "N/A")
+                    st.metric("Regulatory Body", regulatory_body[:30] if regulatory_body != "N/A" else "N/A")
+                
+                # Key Regulations
+                key_regulations = regulations.get("key_regulations", [])
+                if key_regulations:
+                    with st.expander(f"View {len(key_regulations)} Key Regulations"):
+                        for i, reg in enumerate(key_regulations[:10], 1):
+                            st.markdown(f"**{i}. {reg.get('title', 'Regulation')}**")
+                            st.write(reg.get('description', '')[:200] + "...")
+                            if reg.get('source'):
+                                st.markdown(f"[🔗 Source]({reg['source']})")
+                            st.markdown("---")
+                
+                # Compliance Requirements
+                compliance_reqs = regulations.get("compliance_requirements", [])
+                if compliance_reqs:
+                    st.caption(f"Compliance Requirements: {', '.join(compliance_reqs)}")
+            
+            # White Label Compliance
+            compliance = jurisdiction.get("compliance", {})
+            if compliance:
+                white_label_allowed = compliance.get("white_label_allowed", False)
+                if white_label_allowed:
+                    st.success("✅ White Label Platform Model is Allowed")
+                else:
+                    st.warning("⚠️ White Label Platform Model may have restrictions")
+                
+                # License Requirements
+                license_reqs = compliance.get("license_requirements", [])
+                if license_reqs:
+                    with st.expander(f"View {len(license_reqs)} License Requirements"):
+                        for i, req in enumerate(license_reqs[:5], 1):
+                            st.write(f"**{i}.** {req.get('description', '')[:200]}...")
+                            if req.get('source'):
+                                st.markdown(f"[🔗 Source]({req['source']})")
+                            st.markdown("---")
+            
+            # Risks and Opportunities
+            risks_opps = jurisdiction.get("risks_and_opportunities", {})
+            if risks_opps:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    risk_level = risks_opps.get("overall_risk_level", "unknown")
+                    risk_emoji = {
+                        "critical": "🔴",
+                        "high": "🟠",
+                        "medium": "🟡",
+                        "low": "🟢",
+                    }.get(risk_level, "⚪")
+                    st.metric("Overall Risk Level", f"{risk_emoji} {risk_level.upper()}")
+                
+                with col2:
+                    opp_level = risks_opps.get("overall_opportunity_level", "unknown")
+                    opp_emoji = {
+                        "high": "📈",
+                        "medium": "➡️",
+                        "low": "📉",
+                    }.get(opp_level, "⚪")
+                    st.metric("Opportunity Level", f"{opp_emoji} {opp_level.upper()}")
+                
+                # Legal Risks
+                risks_list = risks_opps.get("risks", [])
+                if risks_list:
+                    st.warning(f"⚠️ Found {len(risks_list)} Legal Risks")
+                    with st.expander(f"View {len(risks_list)} Legal Risks"):
+                        for i, risk in enumerate(risks_list[:10], 1):
+                            severity = risk.get("severity", "medium")
+                            severity_emoji = {
+                                "critical": "🔴",
+                                "high": "🟠",
+                                "medium": "🟡",
+                            }.get(severity, "⚪")
+                            st.markdown(f"**{i}. {severity_emoji} {risk.get('title', 'Risk')}**")
+                            st.write(risk.get('description', '')[:300] + "...")
+                            if risk.get('source'):
+                                st.markdown(f"[🔗 Source]({risk['source']})")
+                            st.markdown("---")
+                
+                # Legal Opportunities
+                opps_list = risks_opps.get("opportunities", [])
+                if opps_list:
+                    st.success(f"✅ Found {len(opps_list)} Legal Opportunities")
+                    with st.expander(f"View {len(opps_list)} Legal Opportunities"):
+                        for i, opp in enumerate(opps_list[:10], 1):
+                            st.markdown(f"**{i}. {opp.get('title', 'Opportunity')}**")
+                            st.write(opp.get('description', '')[:300] + "...")
+                            if opp.get('source'):
+                                st.markdown(f"[🔗 Source]({opp['source']})")
+                            st.markdown("---")
+                
+                # Recommendations
+                recommendations = risks_opps.get("recommendations", [])
+                if recommendations:
+                    st.info("💡 Legal Recommendations:")
+                    for rec in recommendations:
+                        st.markdown(f"- {rec}")
+        
         # Intermediate steps for this country
         country_steps = [
             step for step in result.get("total_intermediate_steps", [])
@@ -516,10 +638,11 @@ def main():
         )
 
     # Tabs
-    tab1, tab2, tab3 = st.tabs([
-        "🔍 General Analysis", 
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🔍 General Analysis",
         "🎯 Competitor Tracker",
-        "🌍 Market Intelligence"
+        "🌍 Market Intelligence",
+        "📚 Knowledge Base",
     ])
 
     with tab1:
@@ -687,6 +810,7 @@ def main():
             - Market size analysis
             - White label platform discovery
             - Growth opportunities identification
+            - **Legal & Jurisdiction analysis** (regulations, compliance, risks)
             - Regional market analysis
             
             Enter countries separated by commas to analyze multiple markets.
@@ -708,11 +832,13 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             analyze_button = st.button("🌍 Analyze Markets", type="primary", use_container_width=True)
 
-        col3, col4 = st.columns(2)
+        col3, col4, col5 = st.columns(3)
         with col3:
             include_platforms = st.checkbox("Find White Label Platforms", value=True)
         with col4:
             include_opportunities = st.checkbox("Identify Growth Opportunities", value=True)
+        with col5:
+            include_jurisdiction = st.checkbox("Analyze Legal/Jurisdiction", value=True, help="Analyze legal framework, regulations, and compliance requirements")
 
         if analyze_button and countries_input:
             # Parse countries
@@ -733,10 +859,38 @@ def main():
                             countries,
                             include_platforms=include_platforms,
                             include_opportunities=include_opportunities,
+                            include_jurisdiction=include_jurisdiction,
                         )
                         
                         # Display results
                         display_market_intelligence_results(result, countries)
+                        
+                        # Generate and provide PDF download
+                        try:
+                            from src.utils.pdf_report_generator import MarketIntelligencePDFGenerator
+                            
+                            pdf_generator = MarketIntelligencePDFGenerator()
+                            pdf_bytes = pdf_generator.generate_report(result, countries)
+                            
+                            # Add download button
+                            st.markdown("---")
+                            st.markdown("### 📄 Download Report")
+                            
+                            filename = f"market_intelligence_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                            st.download_button(
+                                label="📥 Download Report (PDF)",
+                                data=pdf_bytes,
+                                file_name=filename,
+                                mime="application/pdf",
+                                type="primary",
+                                use_container_width=True,
+                            )
+                        except ImportError as e:
+                            logger.warning(f"PDF generation not available: {e}")
+                            st.info("💡 Install reportlab to enable PDF report generation: `pip install reportlab`")
+                        except Exception as e:
+                            logger.error(f"Error generating PDF: {e}")
+                            st.warning(f"⚠️ Could not generate PDF report: {str(e)}")
                         
                     except Exception as e:
                         st.error(f"❌ Error analyzing markets: {str(e)}")
@@ -744,6 +898,189 @@ def main():
 
         elif analyze_button and not countries_input:
             st.warning("⚠️ Please enter countries to analyze first!")
+
+    with tab4:
+        st.markdown("## 📚 Knowledge Base")
+        st.info(
+            """
+            **Knowledge Base** - Upload documents to enhance AI responses.
+            
+            Similar to ChatGPT's knowledge base feature:
+            - Upload PDF, TXT, MD files
+            - Documents are automatically indexed and searchable
+            - AI agents will automatically use relevant documents in their responses
+            - Documents persist across sessions
+            """
+        )
+
+        # Knowledge base stats
+        try:
+            from src.utils.knowledge_base import KnowledgeBaseManager
+            
+            try:
+                kb_manager = KnowledgeBaseManager()
+                stats = kb_manager.get_stats()
+                documents = kb_manager.list_documents()
+            except ImportError as e:
+                st.error(f"❌ Knowledge Base dependencies not installed: {str(e)}")
+                st.info(
+                    """
+                    **To enable Knowledge Base feature, install required packages:**
+                    
+                    ```bash
+                    pip install langchain-openai chromadb pypdf
+                    ```
+                    
+                    Or install all dependencies:
+                    ```bash
+                    pip install -r requirements.txt
+                    ```
+                    """
+                )
+                st.stop()
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Documents", stats["total_documents"])
+            with col2:
+                st.metric("Total Size", f"{stats['total_size_mb']} MB")
+            with col3:
+                st.metric("Storage Location", "knowledge_base/")
+            
+            st.markdown("---")
+            
+            # Upload section
+            st.markdown("### 📤 Upload Document")
+            uploaded_file = st.file_uploader(
+                "Choose a file to upload",
+                type=["pdf", "txt", "md"],
+                help="Supported formats: PDF, TXT, MD. Documents will be automatically indexed."
+            )
+            
+            if uploaded_file is not None:
+                # Save uploaded file temporarily
+                import tempfile
+                import os
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp_file:
+                    tmp_file.write(uploaded_file.getvalue())
+                    tmp_path = tmp_file.name
+                
+                # Upload button
+                if st.button("📤 Upload to Knowledge Base", type="primary"):
+                    with st.spinner("🔄 Uploading and indexing document..."):
+                        try:
+                            result = kb_manager.add_document(
+                                tmp_path,
+                                metadata={
+                                    "uploaded_by": "user",
+                                    "original_filename": uploaded_file.name,
+                                }
+                            )
+                            
+                            if result["success"]:
+                                st.success(f"✅ {result['message']}")
+                                st.info(f"📄 Document indexed with {result['chunk_count']} chunks")
+                                
+                                # Refresh stats
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {result['message']}")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Error uploading document: {str(e)}")
+                            logger.error(f"Error uploading document: {e}", exc_info=True)
+                        finally:
+                            # Clean up temp file
+                            if os.path.exists(tmp_path):
+                                os.remove(tmp_path)
+            
+            st.markdown("---")
+            
+            # List documents
+            st.markdown("### 📋 Uploaded Documents")
+            if documents:
+                for i, doc in enumerate(documents, 1):
+                    with st.expander(f"📄 {doc.get('file_name', 'Unknown')} - {doc.get('chunk_count', 0)} chunks"):
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.write(f"**File:** {doc.get('file_name', 'Unknown')}")
+                            st.write(f"**Uploaded:** {doc.get('upload_date', 'Unknown')}")
+                            st.write(f"**Size:** {doc.get('file_size', 0) / 1024:.2f} KB")
+                            st.write(f"**Chunks:** {doc.get('chunk_count', 0)}")
+                        with col2:
+                            file_hash = doc.get('file_hash')
+                            if file_hash and st.button("🗑️ Delete", key=f"delete_{file_hash}"):
+                                with st.spinner("Deleting..."):
+                                    delete_result = kb_manager.delete_document(file_hash)
+                                    if delete_result["success"]:
+                                        st.success("✅ Document deleted")
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ {delete_result['message']}")
+            else:
+                st.info("📭 No documents uploaded yet. Upload a document to get started!")
+            
+            st.markdown("---")
+            
+            # Test search
+            st.markdown("### 🔍 Test Knowledge Base Search")
+            test_query = st.text_input(
+                "Enter a test query:",
+                placeholder="Example: What are the key features?",
+                help="Test how the knowledge base retrieves relevant information"
+            )
+            
+            if test_query and st.button("🔍 Search", type="primary"):
+                with st.spinner("Searching knowledge base..."):
+                    try:
+                        results = kb_manager.search(test_query, k=5)
+                        
+                        if results:
+                            st.success(f"✅ Found {len(results)} relevant chunks")
+                            for i, result in enumerate(results, 1):
+                                with st.expander(f"Result {i} (Score: {result['score']:.4f})"):
+                                    st.write(f"**Source:** {result['metadata'].get('file_name', 'Unknown')}")
+                                    st.write("**Content:**")
+                                    st.write(result['content'][:500] + "..." if len(result['content']) > 500 else result['content'])
+                        else:
+                            st.info("📭 No relevant documents found for this query.")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Error searching: {str(e)}")
+                        logger.error(f"Error searching knowledge base: {e}", exc_info=True)
+        
+        except ImportError as e:
+            st.error(f"❌ Knowledge Base dependencies not installed: {str(e)}")
+            st.info(
+                """
+                **To enable Knowledge Base feature, install required packages:**
+                
+                ```bash
+                    # Activate virtual environment first
+                    source venv/bin/activate  # macOS/Linux
+                    # or
+                    venv\\Scripts\\activate    # Windows
+                    
+                    # Install all dependencies
+                    pip install -r requirements.txt
+                ```
+                
+                **Or install only Knowledge Base dependencies:**
+                ```bash
+                    pip install langchain langchain-text-splitters langchain-openai langchain-community chromadb pypdf
+                ```
+                
+                **After installation, restart Streamlit:**
+                ```bash
+                    ./run_webapp.sh
+                ```
+                """
+            )
+        except Exception as e:
+            st.error(f"❌ Error initializing knowledge base: {str(e)}")
+            logger.error(f"Error in knowledge base tab: {e}", exc_info=True)
+            st.info("💡 Make sure OPENAI_API_KEY is set in your environment variables.")
 
     # Footer
     st.markdown("---")

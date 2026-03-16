@@ -11,6 +11,7 @@ from ..graph.state import GraphState
 from ..nodes.interfaces import DecisionMaker
 from ..utils.errors import GraphError, handle_node_error
 from ..utils.logging import get_logger
+from ..tools.knowledge_base_tools import get_knowledge_base_context
 
 logger = get_logger(__name__)
 
@@ -64,6 +65,7 @@ IMPORTANT:
 - Do NOT add years (like 2023, 2024) to search_query unless user explicitly asks for them
 - For trends queries, use current/recent trends, not specific past years
 - Keep search_query clean and focused on the topic
+- If knowledge base context is provided, use it to inform your decision
 
 Respond in JSON format:
 {{
@@ -74,7 +76,7 @@ Respond in JSON format:
     "reasoning": "explanation"
 }}""",
                 ),
-                ("human", "User query: {query}\nHistory: {history}"),
+                ("human", "User query: {query}\nHistory: {history}\n\nKnowledge Base Context:\n{kb_context}"),
             ]
         )
 
@@ -89,6 +91,15 @@ Respond in JSON format:
         Returns:
             Dictionary with decision data
         """
+        # Get relevant context from knowledge base (RAG)
+        kb_context = ""
+        try:
+            kb_context = get_knowledge_base_context(query, max_chunks=3)
+            if kb_context:
+                logger.info(f"Retrieved {len(kb_context)} chars of context from knowledge base")
+        except Exception as e:
+            logger.warning(f"Could not retrieve knowledge base context: {e}")
+
         if self.llm is None:
             # Mock decision for testing
             return {
@@ -97,12 +108,20 @@ Respond in JSON format:
                 "search_query": query,
                 "needs_charts": False,
                 "reasoning": "Mock decision",
+                "kb_context": kb_context,  # Include KB context even in mock
             }
 
         try:
-            chain = self.prompt | self.llm | self.parser
-            history_str = str(history) if history else "None"
-            result = chain.invoke({"query": query, "history": history_str})
+            formatted = self.prompt.format_messages(
+                query=query,
+                history=str(history) if history else "None",
+                kb_context=kb_context if kb_context else "No relevant context found in knowledge base."
+            )
+            response = self.llm.invoke(formatted)
+            result = self.parser.parse(response.content)
+            
+            # Add KB context to result for use in other nodes
+            result["kb_context"] = kb_context
 
             # Validate result structure
             required_keys = ["decision", "search_type", "search_query", "needs_charts"]

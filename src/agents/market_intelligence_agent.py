@@ -17,6 +17,7 @@ from ..tools.market_intelligence_tools import (
     identify_growth_opportunities,
     analyze_regional_market,
 )
+from .jurisdiction_agent import JurisdictionAgent
 
 logger = get_logger(__name__)
 
@@ -62,6 +63,9 @@ class MarketIntelligenceAgent:
 
         # Store tools for direct use
         self.tools_dict = {tool.name: tool for tool in self.tools}
+        
+        # Initialize Jurisdiction Agent for legal analysis
+        self.jurisdiction_agent = JurisdictionAgent()
 
     def _call_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> Any:
         """
@@ -86,6 +90,7 @@ class MarketIntelligenceAgent:
         include_platforms: bool = True,
         include_opportunities: bool = True,
         include_regional: bool = False,
+        include_jurisdiction: bool = True,
     ) -> Dict[str, Any]:
         """
         Analyze market for a specific country.
@@ -156,6 +161,19 @@ class MarketIntelligenceAgent:
                     "output": regional_result
                 })
             
+            # Step 5: Jurisdiction analysis (legal/regulatory)
+            jurisdiction_result = None
+            if include_jurisdiction:
+                logger.info(f"Analyzing jurisdiction and legal framework for {country}")
+                jurisdiction_result = self.jurisdiction_agent.analyze_jurisdiction(
+                    country,
+                    include_compliance=True,
+                    include_risks_opportunities=True,
+                )
+                # Add jurisdiction steps to intermediate steps
+                if jurisdiction_result.get("intermediate_steps"):
+                    intermediate_steps.extend(jurisdiction_result["intermediate_steps"])
+            
             # Compile results
             result = {
                 "country": country,
@@ -163,6 +181,7 @@ class MarketIntelligenceAgent:
                 "platforms": platforms_result,
                 "opportunities": opportunities_result,
                 "regional": regional_result,
+                "jurisdiction": jurisdiction_result,
                 "intermediate_steps": intermediate_steps,
             }
             
@@ -182,6 +201,7 @@ class MarketIntelligenceAgent:
         countries: List[str],
         include_platforms: bool = True,
         include_opportunities: bool = True,
+        include_jurisdiction: bool = True,
     ) -> Dict[str, Any]:
         """
         Analyze markets for multiple countries sequentially.
@@ -204,6 +224,7 @@ class MarketIntelligenceAgent:
                 country,
                 include_platforms=include_platforms,
                 include_opportunities=include_opportunities,
+                include_jurisdiction=include_jurisdiction,
             )
             
             all_results[country] = country_result

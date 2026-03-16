@@ -6,6 +6,7 @@ from ..utils.errors import handle_node_error
 from ..utils.formatters import ResponseFormatter
 from ..utils.logging import get_logger
 from ..utils.visualization import create_visualization
+from ..tools.knowledge_base_tools import get_knowledge_base_context
 
 logger = get_logger(__name__)
 
@@ -61,10 +62,20 @@ class AnalysisNodeProcessor:
                 f"This may indicate: 1) Empty API response, 2) No data found, 3) Processing error"
             )
 
+        # Get relevant context from knowledge base (RAG)
+        kb_context = ""
+        try:
+            kb_context = get_knowledge_base_context(user_query, max_chunks=5)
+            if kb_context:
+                logger.info(f"Retrieved {len(kb_context)} chars of context from knowledge base for analysis")
+        except Exception as e:
+            logger.warning(f"Could not retrieve knowledge base context: {e}")
+
         # Prepare data for processing
         data_to_format = {
             "search_results": search_results,
             "raw_data": raw_data,
+            "kb_context": kb_context,  # Include KB context for formatter
         }
 
         # Create visualization if needed
@@ -78,10 +89,10 @@ class AnalysisNodeProcessor:
                 charts_created = True
                 logger.info("Visualization created successfully")
 
-        # Format response
+        # Format response (include KB context)
         logger.info(f"[Analysis Node] Formatting response (has_charts={charts_created})")
         formatted_response = self.formatter.format(
-            query=user_query, data=data_to_format, has_charts=charts_created
+            query=user_query, data=data_to_format, has_charts=charts_created, kb_context=kb_context
         )
         logger.info(f"[Analysis Node] Formatted response length: {len(formatted_response) if formatted_response else 0} characters")
 

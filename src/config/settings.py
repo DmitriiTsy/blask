@@ -23,6 +23,16 @@ class Settings(BaseSettings):
     langsmith_api_key: Optional[str] = Field(default=None, alias="LANGSMITH_API_KEY")
     langsmith_project: Optional[str] = Field(default=None, alias="LANGSMITH_PROJECT")
 
+    # Knowledge Base storage settings
+    knowledge_base_storage: str = Field(default="local", alias="KNOWLEDGE_BASE_STORAGE")  # local, s3, gcs
+    knowledge_base_path: Optional[str] = Field(default=None, alias="KNOWLEDGE_BASE_PATH")
+    
+    # Cloud storage (optional)
+    aws_access_key_id: Optional[str] = Field(default=None, alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: Optional[str] = Field(default=None, alias="AWS_SECRET_ACCESS_KEY")
+    s3_bucket: Optional[str] = Field(default=None, alias="S3_BUCKET")
+    gcs_bucket: Optional[str] = Field(default=None, alias="GCS_BUCKET")
+
     # Application settings
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     environment: str = Field(default="development", alias="ENVIRONMENT")
